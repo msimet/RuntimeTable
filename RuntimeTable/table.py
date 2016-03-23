@@ -1,5 +1,11 @@
 import numpy
-import scipy.interp
+import scipy.interpolate
+
+#TODO: not iterable func
+#TODO: logspace
+#TODO: interpolation types
+#TODO: dynamic probing for 1D
+#TODO: dynamic probing for 2D
 
 class RuntimeTable(object):
     """
@@ -60,6 +66,11 @@ class RuntimeTable(object):
             raise RuntimeError('nsteps is iterable, but boundaries is not')
         else:
             self.n_args = 1
+            
+        # so we don't have to do this check during actual initialization of tables
+        if self.n_args == 1 and len(boundaries) == 1:  
+            boundaries = boundaries[0]
+            nsteps = nsteps[0]
 
         self.args = args
         self.kwargs = kwargs
@@ -67,9 +78,42 @@ class RuntimeTable(object):
         self.boundaries = boundaries
         self.nsteps = nsteps
         
+        self.SetupTable()
+
+    # from http://stackoverflow.com/questions/1827489/numpy-meshgrid-in-3d
+    def multimeshgrid(self, *arrs):
+        arrs = tuple(reversed(arrs))  #edit
+        lens = map(len, arrs)
+        dim = len(arrs)
+
+        sz = 1
+        for s in lens:
+            sz*=s
+
+        ans = []    
+        for i, arr in enumerate(arrs):
+            slc = [1]*dim
+            slc[i] = lens[i]
+            arr2 = numpy.asarray(arr).reshape(slc)
+            for j, sz in enumerate(lens):
+                if j!=i:
+                    arr2 = arr2.repeat(sz, axis=j) 
+            ans.append(arr2)
+
+        return tuple(ans)
+        
     def SetupTable(self):
-        pass
-    
+        if self.n_args == 1:
+            self.xvals = numpy.linspace(*self.boundaries, num=self.nsteps)
+            self.yvals = self.func(self.xvals)
+            self.table = scipy.interpolate.interp1d(self.xvals, self.yvals)
+        else:
+            self.xvals = [numpy.linspace(*b, num=n) for b, n in zip(self.boundaries, self.nsteps)]
+            xvals_grids = self.multimeshgrid(*self.xvals)
+            #xvals_args = numpy.dstack(xvals_grids)
+            self.yvals = self.func(*xvals_grids)
+            self.table = scipy.interpolate.RegularGridInterpolator(self.xvals, self.yvals)
+            
     def __call__(self, *args, **kwargs):
         if not len(args)==self.n_args:
             raise ArgumentError("Wrong number of arguments passed to RuntimeTable: expected %i"%
@@ -78,4 +122,5 @@ class RuntimeTable(object):
             return self.table(*args, **kwargs)
         else:
             return self.table(args, **kwargs)
+
 
