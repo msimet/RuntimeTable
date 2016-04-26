@@ -33,7 +33,7 @@ class RuntimeTable(object):
                                 the y-values for the table; alternately, a list of nsteps, one per
                                 argument.  If nsteps is iterable this way, then ``boundaries``
                                 must also be iterable, with the same length.  If ``boundaries``
-                                is iterable but ``nsteps`` is not, the same ``nsteps will be used
+                                is iterable but ``nsteps`` is not, the same ``nsteps`` will be used
                                 for every argument.
     :param args:                Any other arguments, which will be passed to func.
     :param kwargs:              Any other keyword arguments, which will be passed to func.
@@ -46,7 +46,7 @@ class RuntimeTable(object):
          (hasattr(nsteps, '__iter__') and any([n<=0 for n in nsteps]))):
             raise RuntimeError("nsteps must be a positive integer number of steps,"+
                 "or a list of such positive integers for multiple variables!")
-        if (nsteps!=int(nsteps) or
+        if ((not hasattr(nsteps, '__iter__') and nsteps!=int(nsteps)) or
                 hasattr(nsteps, '__iter__') and any([n!=int(n) for n in nsteps])):
             raise RuntimeError("nsteps contains non-integers! %s"%str(nsteps))
         if not hasattr(func, '__call__'):
@@ -109,9 +109,10 @@ class RuntimeTable(object):
             self.table = scipy.interpolate.interp1d(self.xvals, self.yvals)
         else:
             self.xvals = [numpy.linspace(*b, num=n) for b, n in zip(self.boundaries, self.nsteps)]
-            xvals_grids = self.multimeshgrid(*self.xvals)
+            xvals_grids = numpy.meshgrid(*self.xvals)
             #xvals_args = numpy.dstack(xvals_grids)
             self.yvals = self.func(*xvals_grids)
+            self.xvals.reverse()
             self.table = scipy.interpolate.RegularGridInterpolator(self.xvals, self.yvals)
             
     def __call__(self, *args, **kwargs):
